@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.urls import path
 from vkr_project import views
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -11,3 +13,6 @@ urlpatterns = [
     path('api/video_files/', views.video_files_list),
     path('video/delete/', views.video_files_delete, name='video-files-delete'),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
