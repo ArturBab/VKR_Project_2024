@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import *
 from os.path import basename
 
+
 class ContentSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -15,6 +16,17 @@ class AudioFilesSerializer(serializers.ModelSerializer):
         model = AudioFiles
         fields = '__all__'
         depth = 2
+
+    audio_file = serializers.SerializerMethodField()
+
+    def get_audio_file(self, obj):
+        request = self.context.get('request')
+        if request and obj.audio_file:
+            return {
+                'name': basename(obj.audio_file.name),
+                'url': request.build_absolute_uri(obj.audio_file.url)
+            }
+        return None
 
 
 class VideoFilesSerializer(serializers.ModelSerializer):
