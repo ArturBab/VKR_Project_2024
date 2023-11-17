@@ -1,19 +1,102 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-import mimetypes
-from rest_framework.parsers import FileUploadParser
-from django.core.exceptions import ValidationError
-from django.http import HttpResponseBadRequest
+import os
+import time
+from django.http import JsonResponse, HttpResponse
+from django.shortcuts import get_object_or_404
+
 
 from .models import *
 from .serializers import *
+from .filters import ContentFilter
+
+
+def measure_bandwidth_video(request, video_id):
+    try:
+        # Получаем объект видео по переданному ID
+        video = get_object_or_404(VideoFiles, pk=video_id)
+        video_path = video.video_file.path  # Получаем путь к видеофайлу
+
+        # Измерение времени передачи видеофайла клиенту
+        start_time = time.time()
+
+        # Отправляем видеофайл клиенту
+        with open(video_path, 'rb') as video_file:
+            response = HttpResponse(video_file, content_type='video/mp4')
+
+        end_time = time.time()
+
+        # Вычисление времени передачи
+        duration = end_time - start_time
+
+        # Подсчет пропускной способности в Mbps (мегабитах в секунду)
+        file_size_in_bytes = os.path.getsize(video_path)
+        bandwidth = (file_size_in_bytes * 8) / \
+            (duration * 1000000)  # Переводим в Mbps
+
+        video_file_info = {
+            'id': video.id,
+            'title': video.title_video,
+            'description': video.description,
+            'format': video.format,
+            'bandwidth_video_file': bandwidth
+        }
+
+        # Возвращаем пропускную способность в JSON формате
+        return JsonResponse(video_file_info)
+
+    except FileNotFoundError:
+        return HttpResponse("File not found", status=404)
+
+
+def measure_bandwidth_audio(request, audio_id):
+    try:
+        # Получаем объект видео по переданному ID
+        audio = get_object_or_404(AudioFiles, pk=audio_id)
+        audio_path = audio.audio_file.path  # Получаем путь к видеофайлу
+
+        # Измерение времени передачи видеофайла клиенту
+        start_time = time.time()
+
+        # Отправляем видеофайл клиенту
+        with open(audio_path, 'rb') as audio_file:
+            response = HttpResponse(audio_file, content_type='audio/mp3')
+
+        end_time = time.time()
+
+        # Вычисление времени передачи
+        duration = end_time - start_time
+
+        # Подсчет пропускной способности в Mbps (мегабитах в секунду)
+        file_size_in_bytes = os.path.getsize(audio_path)
+        bandwidth = (file_size_in_bytes * 8) / \
+            (duration * 1000000)  # Переводим в Mbps
+
+        audio_file_info = {
+            'id': audio.id,
+            'name_audio': audio.name_audio,
+            'creator_audio': audio.creator_audio,
+            'format': audio.format,
+            'bandwidth_audio_file': bandwidth
+        }
+
+        # Возвращаем пропускную способность в JSON формате
+        return JsonResponse(audio_file_info)
+
+    except FileNotFoundError:
+        return HttpResponse("File not found", status=404)
 
 
 @api_view(['GET', 'POST'])
 def content_list(request):
     if request.method == 'GET':
         content = Content.objects.all()
+
+        # Применяем фильтр, если переданы параметры фильтрации в запросе
+        # filterset = ContentFilter(request.GET, queryset=queryset)
+        # queryset = filterset.qs
+
         serializer = ContentSerializer(content, many=True)
         return Response(serializer.data)
 
@@ -21,15 +104,14 @@ def content_list(request):
         serializer = ContentSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            content_file = request.FILES.get('content_file')
-            if content_file:
-                ###
-                # Сохранение файла в модели Content
-                content = serializer.instance
-                content.content_file = content_file
+
+            content = serializer.instance
+            if 'content_file' in request.FILES:
+                content.content_file = request.FILES['content_file']
                 content.save()
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -67,7 +149,7 @@ def audio_files_list(request):
                                 status=status.HTTP_400_BAD_REQUEST)
 
             content_id = request.data.get('content_id')
-            video_id = request.data.get('video_id')  # Получаем video_id
+            video_id = request.data.get('video_id')
 
             # Проверяем, существует ли контент с переданным content_id
             try:
