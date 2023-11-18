@@ -5,87 +5,12 @@ import os
 import time
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404
+import json
 
 
 from .models import *
 from .serializers import *
 from .filters import ContentFilter
-
-
-def measure_bandwidth_video(request, video_id):
-    try:
-        # Получаем объект видео по переданному ID
-        video = get_object_or_404(VideoFiles, pk=video_id)
-        video_path = video.video_file.path  # Получаем путь к видеофайлу
-
-        # Измерение времени передачи видеофайла клиенту
-        start_time = time.time()
-
-        # Отправляем видеофайл клиенту
-        with open(video_path, 'rb') as video_file:
-            response = HttpResponse(video_file, content_type='video/mp4')
-
-        end_time = time.time()
-
-        # Вычисление времени передачи
-        duration = end_time - start_time
-
-        # Подсчет пропускной способности в Mbps (мегабитах в секунду)
-        file_size_in_bytes = os.path.getsize(video_path)
-        bandwidth = (file_size_in_bytes * 8) / \
-            (duration * 1000000)  # Переводим в Mbps
-
-        video_file_info = {
-            'id': video.id,
-            'title': video.title_video,
-            'description': video.description,
-            'format': video.format,
-            'bandwidth_video_file': bandwidth
-        }
-
-        # Возвращаем пропускную способность в JSON формате
-        return JsonResponse(video_file_info)
-
-    except FileNotFoundError:
-        return HttpResponse("File not found", status=404)
-
-
-def measure_bandwidth_audio(request, audio_id):
-    try:
-        # Получаем объект видео по переданному ID
-        audio = get_object_or_404(AudioFiles, pk=audio_id)
-        audio_path = audio.audio_file.path  # Получаем путь к видеофайлу
-
-        # Измерение времени передачи видеофайла клиенту
-        start_time = time.time()
-
-        # Отправляем видеофайл клиенту
-        with open(audio_path, 'rb') as audio_file:
-            response = HttpResponse(audio_file, content_type='audio/mp3')
-
-        end_time = time.time()
-
-        # Вычисление времени передачи
-        duration = end_time - start_time
-
-        # Подсчет пропускной способности в Mbps (мегабитах в секунду)
-        file_size_in_bytes = os.path.getsize(audio_path)
-        bandwidth = (file_size_in_bytes * 8) / \
-            (duration * 1000000)  # Переводим в Mbps
-
-        audio_file_info = {
-            'id': audio.id,
-            'name_audio': audio.name_audio,
-            'creator_audio': audio.creator_audio,
-            'format': audio.format,
-            'bandwidth_audio_file': bandwidth
-        }
-
-        # Возвращаем пропускную способность в JSON формате
-        return JsonResponse(audio_file_info)
-
-    except FileNotFoundError:
-        return HttpResponse("File not found", status=404)
 
 
 @api_view(['GET', 'POST'])
@@ -125,9 +50,51 @@ def content_delete(request):
 def audio_files_list(request):
     if request.method == 'GET':
         audio_files = AudioFiles.objects.all()
-        serializer = AudioFilesSerializer(
-            audio_files, many=True, context={'request': request})
-        return Response(serializer.data)
+        audio_data = []
+        for audio in audio_files:
+            audio_path = audio.audio_file.path
+
+            # Измерение пропускной способности
+            start_time = time.time()
+            with open(audio_path, 'rb') as audio_file:
+                response = HttpResponse(audio_file, content_type='audio/mp3')
+
+            end_time = time.time()
+
+            # Вычисление времени передачи
+            duration = end_time - start_time
+
+            # Размер файла в мегабайтах
+            size_in_mb = round(audio.audio_file.size / (1024 * 1024), 2)
+
+            # Подсчет пропускной способности в Mbps
+            file_size_in_bytes = os.path.getsize(audio_path)
+            bandwidth = (file_size_in_bytes * 8) / \
+                (duration * 1000000)  # Переводим в Mbps
+
+            # Обновление поля пропускной способности в объекте AudioFiles
+            audio.bandwidth = bandwidth
+            bandwidth_in_mbps = round(bandwidth, 2)
+            audio.save()
+
+            # Формирование данных для JsonResponse
+            audio_info = {
+                'id': audio.id,
+                'name_audio': audio.name_audio,
+                'creator_audio': audio.name_audio,
+                'data_create': audio.name_audio,
+                'file_path': audio.file_path,
+                'audio_file': {
+                    'url': audio.audio_file.url,
+                    'name': str(audio.audio_file),  # Имя файла
+                    'size': f"{size_in_mb} MB",  # Размер файла в мегабайтах
+                    'format': audio.format,
+                    'bandwidth_audio_file': f"{bandwidth_in_mbps} Mbps"
+                }
+            }
+            audio_data.append(audio_info)
+
+        return JsonResponse(audio_data, safe=False)
 
     elif request.method == 'POST':
         serializer = AudioFilesSerializer(
@@ -184,9 +151,50 @@ def audio_files_delete(request):
 def video_files_list(request):
     if request.method == 'GET':
         video_files = VideoFiles.objects.all()
-        serializer = VideoFilesSerializer(
-            video_files, many=True, context={'request': request})
-        return Response(serializer.data)
+        video_data = []
+        for video in video_files:
+            video_path = video.video_file.path
+
+            # Измерение пропускной способности
+            start_time = time.time()
+            with open(video_path, 'rb') as video_file:
+                response = HttpResponse(video_file, content_type='video/mp4')
+
+            end_time = time.time()
+
+            # Вычисление времени передачи
+            duration = end_time - start_time
+
+            # Размер файла в мегабайтах
+            size_in_mb = round(video.video_file.size / (1024 * 1024), 2)
+
+            # Подсчет пропускной способности в Mbps
+            file_size_in_bytes = os.path.getsize(video_path)
+            bandwidth = (file_size_in_bytes * 8) / \
+                (duration * 1000000)  # Переводим в Mbps
+
+            # Обновление поля пропускной способности в объекте VideoFiles
+            video.bandwidth = bandwidth
+            bandwidth_in_mbps = round(bandwidth, 2)
+            video.save()
+
+            # Формирование данных для JsonResponse
+            video_info = {
+                'id': video.id,
+                'title_video': video.title_video,
+                'description': video.description,
+                'file_path': video.file_path,
+                'video_file': {
+                    'url': video.video_file.url,
+                    'name': str(video.video_file),  # Имя файла
+                    'size': f"{size_in_mb} MB",  # Размер файла в мегабайтах
+                    'format': video.format,
+                    'bandwidth_video_file': f"{bandwidth_in_mbps} Mbps"
+                }
+            }
+            video_data.append(video_info)
+
+        return JsonResponse(video_data, safe=False)
 
     elif request.method == 'POST':
         serializer = VideoFilesSerializer(
@@ -228,3 +236,29 @@ def video_files_list(request):
 def video_files_delete(request):
     VideoFiles.objects.all().delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def prioritize_content(request, video_id, audio_id):
+    # Получаем измерения пропускной способности для видео и аудио
+    video_bandwidth_response = check_bandwidth_video(request, video_id)
+    audio_bandwidth_response = check_bandwidth_audio(request, audio_id)
+
+    video_bandwidth_data = json.loads(video_bandwidth_response.content)
+    audio_bandwidth_data = json.loads(audio_bandwidth_response.content)
+
+    video_bandwidth = video_bandwidth_data.get('bandwidth_video_file', 0)
+    audio_bandwidth = audio_bandwidth_data.get('bandwidth_audio_file', 0)
+
+    # Определяем приоритет отображения на основе пропускной способности
+    if video_bandwidth > audio_bandwidth:
+        priority_content = {
+            'priority': 'video',
+            'video_bandwidth': video_bandwidth
+        }
+    else:
+        priority_content = {
+            'priority': 'audio',
+            'audio_bandwidth': audio_bandwidth
+        }
+
+    return JsonResponse(priority_content)
