@@ -33,11 +33,21 @@ def content_list(request):
             content = serializer.instance
             if 'content_file' in request.FILES:
                 content.content_file = request.FILES['content_file']
-                content.save()
+                content.save()   
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['PUT'])
+def update_content(request, content_id):
+    content = get_object_or_404(Content, pk=content_id)
+    serializer = ContentSerializer(content, data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET', 'DELETE'])
@@ -141,10 +151,32 @@ def audio_files_list(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+# Функции для работы с аудио-файлами
+@api_view(['PUT'])
+def update_audio_file(request, audio_id):
+    audio = get_object_or_404(AudioFiles, pk=audio_id)
+    
+    if request.method == 'PUT':
+        serializer = AudioFilesSerializer(audio, data=request.data)
+        if serializer.is_valid():
+            audio_file = request.FILES.get('audio_file')
+            if audio_file:
+                # Проверяем формат файла
+                allowed_formats = ['mp3', 'aac', 'wav', 'flac', 'dsd']
+                file_extension = audio_file.name.split('.')[-1].lower() if '.' in audio_file.name else None
+                if file_extension not in allowed_formats:
+                    return Response({'error': f'Invalid audio file format. Allowed formats: {", ".join(allowed_formats)}.'},
+                                    status=status.HTTP_400_BAD_REQUEST)
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
 @api_view(['DELETE'])
 def audio_files_delete(request):
     AudioFiles.objects.all().delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 
 @api_view(['GET', 'POST'])
@@ -231,34 +263,27 @@ def video_files_list(request):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+@api_view(['PUT'])
+def update_video_file(request, video_id):
+    video = get_object_or_404(VideoFiles, pk=video_id)
+    
+    if request.method == 'PUT':
+        serializer = VideoFilesSerializer(video, data=request.data)
+        if serializer.is_valid():
+            video_file = request.FILES.get('video_file')
+            if video_file:
+                # Проверяем формат файла
+                allowed_formats = ['mp4', 'mkv']
+                file_extension = video_file.name.split('.')[-1].lower() if '.' in video_file.name else None
+                if file_extension not in allowed_formats:
+                    return Response({'error': f'Invalid video file format. Allowed formats: {", ".join(allowed_formats)}.'},
+                                    status=status.HTTP_400_BAD_REQUEST)
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(['DELETE'])
 def video_files_delete(request):
     VideoFiles.objects.all().delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-def prioritize_content(request, video_id, audio_id):
-    # Получаем измерения пропускной способности для видео и аудио
-    video_bandwidth_response = check_bandwidth_video(request, video_id)
-    audio_bandwidth_response = check_bandwidth_audio(request, audio_id)
-
-    video_bandwidth_data = json.loads(video_bandwidth_response.content)
-    audio_bandwidth_data = json.loads(audio_bandwidth_response.content)
-
-    video_bandwidth = video_bandwidth_data.get('bandwidth_video_file', 0)
-    audio_bandwidth = audio_bandwidth_data.get('bandwidth_audio_file', 0)
-
-    # Определяем приоритет отображения на основе пропускной способности
-    if video_bandwidth > audio_bandwidth:
-        priority_content = {
-            'priority': 'video',
-            'video_bandwidth': video_bandwidth
-        }
-    else:
-        priority_content = {
-            'priority': 'audio',
-            'audio_bandwidth': audio_bandwidth
-        }
-
-    return JsonResponse(priority_content)
