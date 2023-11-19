@@ -3,13 +3,6 @@ from .models import *
 from os.path import basename
 
 
-class ContentSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Content
-        fields = '__all__'
-
-
 class AudioFilesSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -46,3 +39,13 @@ class VideoFilesSerializer(serializers.ModelSerializer):
                 'url': request.build_absolute_uri(obj.video_file.url)
             }
         return None
+
+
+class ContentSerializer(serializers.ModelSerializer):
+
+    audio_files = AudioFilesSerializer(many=True, read_only=True)
+    video_files = VideoFilesSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Content
+        fields = '__all__'
