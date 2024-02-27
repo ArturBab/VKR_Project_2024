@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import *
 from os.path import basename
-
+from djoser.serializers import UserCreateSerializer, UserSerializer
 
 class AudioFilesSerializer(serializers.ModelSerializer):
 
