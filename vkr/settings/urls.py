@@ -3,6 +3,13 @@ from django.urls import path
 from vkr_project import views
 from django.conf import settings
 from django.conf.urls.static import static
+from vkr_project.user_views import register_view, login_view, user_view, logout_view
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+    TokenVerifyView,
+)
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -23,6 +30,16 @@ urlpatterns = [
          views.update_video_file, name='update_video_file'),
     path('api/video/delete/<int:video_id>/',
          views.video_files_delete, name='video-files-delete'),
+
+     path('api/register/', register_view, name='registration'),
+     path('api/login/', login_view, name='login'),
+     path('api/auth_user/', user_view, name='auth'),
+     path('api/logout/', logout_view, name='logout'),
+
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
+ 
 ]
 
 if settings.DEBUG:
