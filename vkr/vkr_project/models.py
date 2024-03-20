@@ -12,6 +12,8 @@ class User(AbstractUser):
     email = models.CharField(max_length=255, unique=True)
     password = models.CharField(max_length=255)
     username = models.CharField(max_length=255, unique=True)
+    role = models.CharField(max_length=20)
+    group = models.CharField(max_length=20, blank=True, null=True)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
@@ -21,7 +23,8 @@ class Content(models.Model):
     title = models.CharField(max_length=255)
     file_path = models.CharField(max_length=255)
     content_file = models.FileField(upload_to='content_files/')
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contents')
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='contents')
 
     def __str__(self):
         return self.title
@@ -37,7 +40,8 @@ class VideoFiles(models.Model):
     bandwidth = models.FloatField(null=True, blank=True)
     content_id = models.ForeignKey(
         Content, on_delete=models.CASCADE, related_name='video_files')
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='videos')
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='videos')
 
     def __str__(self):
         return self.title_video
@@ -84,7 +88,8 @@ class AudioFiles(models.Model):
         Content, on_delete=models.CASCADE, related_name='audio_file')
     video_id = models.OneToOneField(
         VideoFiles, on_delete=models.CASCADE, related_name='audio_file')
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='audios')
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='audios')
 
     def __str__(self):
         return self.name_audio
