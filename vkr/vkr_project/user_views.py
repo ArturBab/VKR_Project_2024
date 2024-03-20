@@ -1,6 +1,5 @@
 from django.db import IntegrityError
 from rest_framework.decorators import api_view
-from rest_framework.views import APIView
 from .serializers import UserSerializer
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
@@ -16,6 +15,12 @@ def register_view(request):
         try:
             data = request.data.copy()
             password = data.pop('password', None)
+            role = data.get('role')
+
+            if role == 'Student':
+                if 'group' not in data or not data['group']:
+                    return Response({'error': 'Пожалуйста, введите Вашу учебную группу.'}, status=status.HTTP_400_BAD_REQUEST)
+
             user = User.objects.create(**data)
             if password is not None:
                 user.set_password(password)
@@ -98,3 +103,11 @@ def logout_view(request):
         'message': 'Вы вышли из системы.'
     }
     return response
+
+
+@api_view(['GET'])
+def list_users_for_admin(request):
+    if request.method == 'GET':
+        users = User.objects.all()
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data)
