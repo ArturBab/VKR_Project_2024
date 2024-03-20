@@ -53,7 +53,7 @@ class VideoFiles(models.Model):
             # Измеренеие пропускной способности
             start_time = time.time()
             with open(video_path, 'rb') as video_file:
-                # Отправляем видеофайл клиенту (это может быть не обязательно для вашего случая)
+                # Отправляем видеофайл клиенту
                 response = HttpResponse(video_file, content_type='video/mp4')
 
             end_time = time.time()
@@ -101,7 +101,7 @@ class AudioFiles(models.Model):
             # Измеренеие пропускной способности
             start_time = time.time()
             with open(audio_path, 'rb') as audio_file:
-                # Отправляем видеофайл клиенту (это может быть не обязательно для вашего случая)
+                # Отправляем аудиофайл клиенту
                 response = HttpResponse(audio_file, content_type='audio/mp3')
 
             end_time = time.time()
