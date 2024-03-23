@@ -15,8 +15,6 @@ class User(AbstractUser):
     role = models.CharField(max_length=20)
     group = models.CharField(max_length=20, blank=True, null=True)
 
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username']
 
 
 class Content(models.Model):
