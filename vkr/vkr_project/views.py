@@ -1,4 +1,5 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 import os
@@ -6,21 +7,28 @@ import time
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404
 import json
-
-
+from .permissions import *
 from .models import *
 from .serializers import *
-from .filters import ContentFilter
+
 
 
 @api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated, IsTeacherOrReadOnly])
 def content_list(request):
+    # Получаем авторизованного пользователя
+    user = request.user
     if request.method == 'GET':
-        content = Content.objects.all()
-
-        # Применяем фильтр, если переданы параметры фильтрации в запросе
-        # filterset = ContentFilter(request.GET, queryset=queryset)
-        # queryset = filterset.qs
+        # Получаем контент, доступный для просмотра авторизованному пользователю
+        if user.role == 'Student':
+            # Для студента показываем только контент, доступный его группе
+            content = Content.objects.filter(user__role='Teacher')
+        elif user.role == 'Teacher':
+            # Для преподавателя показываем его собственный контент
+            content = Content.objects.filter(user=user)
+        else:
+            # Для других пользователей пока не показываем контент
+            content = Content.objects.none()
 
         serializer = ContentSerializer(content, many=True)
         return Response(serializer.data)
@@ -28,12 +36,12 @@ def content_list(request):
     elif request.method == 'POST':
         serializer = ContentSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-
+            # Передаем текущего пользователя
+            serializer.save(user=request.user)
             content = serializer.instance
             if 'content_file' in request.FILES:
                 content.content_file = request.FILES['content_file']
-                content.save()   
+                content.save()
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -41,19 +49,44 @@ def content_list(request):
 
 
 @api_view(['PUT'])
+@permission_classes([IsAuthenticated, IsTeacherAndOwnerOrReadOnly])
 def update_content(request, content_id):
-    content = get_object_or_404(Content, pk=content_id)
-    serializer = ContentSerializer(content, data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # Получаем текущего пользователя
+    user = request.user
+
+    if request.method == 'PUT':
+        # Получаем контент для обновления
+        content = get_object_or_404(Content, pk=content_id)
+
+        # Проверяем, принадлежит ли контент текущему пользователю (преподавателю)
+        if content.user != user:
+            return Response({'error': 'Вы не имеете прав на редактирование этого контента'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Продолжаем обработку запроса только если контент принадлежит текущему пользователю
+        serializer = ContentSerializer(content, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+    return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET', 'DELETE'])
-def content_delete(request):
-    Content.objects.all().delete()
-    return Response(status=status.HTTP_204_NO_CONTENT)
+@permission_classes([IsAuthenticated, IsTeacherAndOwnerOrReadOnly])
+def content_delete(request, content_id):
+    # Получаем текущего пользователя
+    user = request.user
+    if request.method == 'DELETE':
+        # Получаем контент для удаления
+        content = get_object_or_404(Content, pk=content_id)
+
+        # Проверяем, принадлежит ли контент текущему пользователю (преподавателю)
+        if content.user != user:
+            return Response({'error': 'Вы не имеете прав на удаление этого контента'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Продолжаем удаление только если контент принадлежит текущему пользователю
+        content.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET', 'POST'])
@@ -155,7 +188,7 @@ def audio_files_list(request):
 @api_view(['PUT'])
 def update_audio_file(request, audio_id):
     audio = get_object_or_404(AudioFiles, pk=audio_id)
-    
+
     if request.method == 'PUT':
         serializer = AudioFilesSerializer(audio, data=request.data)
         if serializer.is_valid():
@@ -163,20 +196,20 @@ def update_audio_file(request, audio_id):
             if audio_file:
                 # Проверяем формат файла
                 allowed_formats = ['mp3', 'aac', 'wav', 'flac', 'dsd']
-                file_extension = audio_file.name.split('.')[-1].lower() if '.' in audio_file.name else None
+                file_extension = audio_file.name.split(
+                    '.')[-1].lower() if '.' in audio_file.name else None
                 if file_extension not in allowed_formats:
                     return Response({'error': f'Invalid audio file format. Allowed formats: {", ".join(allowed_formats)}.'},
                                     status=status.HTTP_400_BAD_REQUEST)
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
 
 @api_view(['DELETE'])
 def audio_files_delete(request):
     AudioFiles.objects.all().delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
-
 
 
 @api_view(['GET', 'POST'])
@@ -263,10 +296,11 @@ def video_files_list(request):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(['PUT'])
 def update_video_file(request, video_id):
     video = get_object_or_404(VideoFiles, pk=video_id)
-    
+
     if request.method == 'PUT':
         serializer = VideoFilesSerializer(video, data=request.data)
         if serializer.is_valid():
@@ -274,7 +308,8 @@ def update_video_file(request, video_id):
             if video_file:
                 # Проверяем формат файла
                 allowed_formats = ['mp4', 'mkv']
-                file_extension = video_file.name.split('.')[-1].lower() if '.' in video_file.name else None
+                file_extension = video_file.name.split(
+                    '.')[-1].lower() if '.' in video_file.name else None
                 if file_extension not in allowed_formats:
                     return Response({'error': f'Invalid video file format. Allowed formats: {", ".join(allowed_formats)}.'},
                                     status=status.HTTP_400_BAD_REQUEST)
