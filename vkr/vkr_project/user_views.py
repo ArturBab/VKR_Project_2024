@@ -1,73 +1,41 @@
-from django.db import IntegrityError
-from rest_framework.decorators import api_view
-from .serializers import UserSerializer
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework import generics, status
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework_simplejwt.tokens import RefreshToken
+from .serializers import UserSerializer
 from .models import User
-import jwt
-import datetime
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.exceptions import AuthenticationFailed
+from .permissions import *
+
+
+class RegisterAPIView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
 
 
 @api_view(['POST'])
-def register_view(request):
+def logout_view(request):
     if request.method == 'POST':
         try:
-            data = request.data.copy()
-            password = data.pop('password', None)
-            role = data.get('role')
+            refresh_token = request.COOKIES.get('refresh_token')
 
-            if role == 'Student':
-                if 'group' not in data or not data['group']:
-                    return Response({'error': 'Пожалуйста, введите Вашу учебную группу.'}, status=status.HTTP_400_BAD_REQUEST)
+            if refresh_token is None:
+                raise AuthenticationFailed('Пользователь не аутентифицирован.')
 
-            user = User.objects.create(**data)
-            if password is not None:
-                user.set_password(password)
-                user.save()
-            serializer = UserSerializer(user)
-            return Response({'message': 'Вы были успешно зарегистрированы в систему.', 'user': serializer.data}, status=status.HTTP_201_CREATED)
-
-        except IntegrityError as e:
-            if 'UNIQUE constraint failed: vkr_project_user.username' in str(e):
-                error_message = 'Такое имя пользователя уже существует.'
-            elif 'UNIQUE constraint failed: vkr_project_user.email' in str(e):
-                error_message = 'Такая почта уже существует.'
-            else:
-                error_message = 'Произошла ошибка при регистрации пользователя.'
-            return Response({'error': error_message}, status=status.HTTP_400_BAD_REQUEST)
-
-
-@api_view(['POST'])
-def login_view(request):
-    if request.method == 'POST':
-        try:
-            username = request.data['username']
-            password = request.data['password']
-
-            user = User.objects.filter(username=username).first()
-
-            if user is None:
-                raise AuthenticationFailed('Данный пользователь не найден.')
-
-            if not user.check_password(password):
-                raise AuthenticationFailed('Пароль не верный.')
-
-            payload = {
-                'id': user.id,
-                'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=60),
-                'iat': datetime.datetime.utcnow()
-            }
-
-            token = jwt.encode(payload, 'secret',
-                               algorithm='HS256').decode('utf-8')
-
+            # Очистка куки с access и refresh токенами
             response = Response()
+            response.delete_cookie('refresh_token')
+            response.delete_cookie('access_token')
 
-            response.set_cookie(key='jwt', value=token, httponly=True)
+            # Удаление refresh токена из базы данных
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+
             response.data = {
-                'message': 'Вы успешно авторизовались.',
-                'jwt': token
+                'message': 'Вы успешно вышли из системы.'
             }
 
             return response
@@ -77,37 +45,36 @@ def login_view(request):
 
 
 @api_view(['GET'])
-def user_view(request):
+@permission_classes([IsAuthenticated])
+def student_list(request):
+    """
+    Представление для получения списка студентов преподавателем.
+    """
     if request.method == 'GET':
-        token = request.COOKIES.get('jwt')
+        # Проверяем, является ли пользователь преподавателем
+        if request.user.role != 'Teacher':
+            return Response({'message': 'У вас нет прав доступа'}, status=status.HTTP_403_FORBIDDEN)
 
-        if not token:
-            raise AuthenticationFailed('Вы не были авторизованы')
-
-        try:
-            payload = jwt.decode(token, 'secret', algorithm=['HS256'])
-        except jwt.ExpiredSignatureError:
-            raise AuthenticationFailed('Вы не были авторизованы')
-
-        user = User.objects.filter(id=payload['id']).first()
-        serializer = UserSerializer(user)
-
+        # Получаем всех студентов
+        students = User.objects.filter(role='Student')
+        serializer = UserSerializer(students, many=True)
         return Response(serializer.data)
 
 
-@api_view(['POST'])
-def logout_view(request):
-    response = Response()
-    response.delete_cookie('jwt')
-    response.data = {
-        'message': 'Вы вышли из системы.'
-    }
-    return response
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsTeacherOrReadOnly])
+def list_student_groups(request):
+    if request.method == 'GET':
+        student_groups = User.objects.filter(
+            role='Student').values_list('group', flat=True).distinct()
+
+        return Response({'student_groups': student_groups}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
-def list_users_for_admin(request):
+@permission_classes([AllowAny])
+def teachers_list(request):
     if request.method == 'GET':
-        users = User.objects.all()
-        serializer = UserSerializer(users, many=True)
+        teachers = User.objects.filter(role='Teacher')
+        serializer = UserSerializer(teachers, many=True)
         return Response(serializer.data)
