@@ -8,9 +8,8 @@ from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404
 import json
 from ..permissions import *
-from ..models import *
-from ..serializers import *
-
+from ..models import Content, User
+from ..serializers import ContentSerializer
 
 
 @api_view(['GET', 'POST'])
@@ -33,17 +32,54 @@ def content_list(request):
         serializer = ContentSerializer(content, many=True)
         return Response(serializer.data)
 
-    elif request.method == 'POST':
+    if request.method == 'POST':
+        # Проверяем наличие поля group в запросе
+        group_number = request.data.get('group')
+        if not group_number:
+            return Response({'error': 'Укажите номер учебной группы студентов.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Проверяем роль пользователя
+        if user.role == 'Student':
+            # Получаем номер учебной группы текущего пользователя
+            user_group_number = user.group
+            # Добавим отладочный вывод
+            print("User's group number:", user_group_number)
+            if not user_group_number:
+                return Response({'error': 'Укажите номер учебной группы студентов.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Проверяем существование учебной группы по ее номеру
+            if not User.objects.filter(role='Student', group=user_group_number).exists():
+                # Добавим отладочный вывод
+                print("Group does not exist:", user_group_number)
+                return Response({'error': 'Указанная учебная группа не существует.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Добавим отладочный вывод
+            print("Group exists:", user_group_number)
+
+        # Проверяем существование указанной учебной группы
+        if not User.objects.filter(role='Student', group=group_number).exists():
+            # Добавим отладочный вывод
+            print("Group does not exist:", group_number)
+            return Response({'error': 'Указанная учебная группа не существует.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Ваш текущий код для обработки POST запроса
+        request.data['user'] = request.user.id
         serializer = ContentSerializer(data=request.data)
         if serializer.is_valid():
-            # Передаем текущего пользователя
             serializer.save(user=request.user)
             content = serializer.instance
             if 'content_file' in request.FILES:
                 content.content_file = request.FILES['content_file']
                 content.save()
 
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            # Получаем информацию о предоставленной группе
+            group_info = group_number or user.group
+
+            # Обновляем сериализатор для включения информации о группе
+            serialized_data = serializer.data
+            serialized_data['group'] = group_info
+
+            return Response(serialized_data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -63,6 +99,7 @@ def update_content(request, content_id):
             return Response({'error': 'Вы не имеете прав на редактирование этого контента'}, status=status.HTTP_403_FORBIDDEN)
 
         # Продолжаем обработку запроса только если контент принадлежит текущему пользователю
+        request.data['user'] = request.user.id
         serializer = ContentSerializer(content, data=request.data)
         if serializer.is_valid():
             serializer.save()
