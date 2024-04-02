@@ -7,30 +7,32 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'name', 'middle_name', 'last_name', 'email', 'password', 'role', 'group']
+        fields = ['id', 'username', 'name', 'middle_name',
+                  'last_name', 'email', 'password', 'role', 'group']
         extra_kwargs = {'password': {'write_only': True}}
 
     def create(self, validated_data):
         role = validated_data.get('role')
         group = validated_data.get('group')
-        
+
         if role == 'Teacher':
             validated_data.pop('group', None)
         elif role == 'Student':
             if not group:
-                raise serializers.ValidationError("Для студента необходимо указать группу.")
+                raise serializers.ValidationError(
+                    "Для студента необходимо указать группу.")
         else:
             raise serializers.ValidationError("Недопустимая роль.")
-        
+
         password = validated_data.pop('password', None)
         instance = self.Meta.model(**validated_data)
-        
+
         if password is not None:
             instance.set_password(password)
-        
+
         instance.save()
         return instance
-        
+
 
 class AudioFilesSerializer(serializers.ModelSerializer):
 
@@ -71,7 +73,8 @@ class VideoFilesSerializer(serializers.ModelSerializer):
 
 
 class ContentSerializer(serializers.ModelSerializer):
-
+    
+    group = serializers.CharField(source='user.group', read_only=True)
     audio_files = AudioFilesSerializer(many=True, read_only=True)
     video_files = VideoFilesSerializer(many=True, read_only=True)
 
