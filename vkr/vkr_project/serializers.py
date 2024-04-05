@@ -39,7 +39,7 @@ class AudioFilesSerializer(serializers.ModelSerializer):
     class Meta:
         model = AudioFiles
         fields = '__all__'
-        depth = 2
+        depth = 1
 
     audio_file = serializers.SerializerMethodField()
 
@@ -51,10 +51,44 @@ class AudioFilesSerializer(serializers.ModelSerializer):
                 'url': request.build_absolute_uri(obj.audio_file.url)
             }
         return None
+    
+    def create(self, validated_data):
+        # Добавляем поле group_educational из запроса
+        group_educational = validated_data.pop('group_educational', None)
 
+        # Создаем новый объект контента с указанием группы
+        audioofiles = VideoFiles.objects.create(group_educational=group_educational, **validated_data)
+        return audioofiles
+
+
+class ContentSerializer(serializers.ModelSerializer):
+
+    audio_files = AudioFilesSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Content
+        fields = '__all__'
+        extra_kwargs = {
+            'user': {'required': False, 'allow_null': True}  # Делаем поле user необязательным
+        }
+
+    def create(self, validated_data):
+        # Добавляем поле group_educational из запроса
+        group_educational = validated_data.pop('group_educational', None)
+
+        # Создаем новый объект контента с указанием группы
+        content = Content.objects.create(group_educational=group_educational, **validated_data)
+        return content
+    
+    def get_video_files(self, obj):
+        video_files = obj.video_files.all()
+        serializer = VideoFilesSerializer(video_files, many=True)
+        return serializer.data
+    
+    
 
 class VideoFilesSerializer(serializers.ModelSerializer):
-
+    content = ContentSerializer(read_only=True)
     class Meta:
         model = VideoFiles
         fields = '__all__'
@@ -70,14 +104,11 @@ class VideoFilesSerializer(serializers.ModelSerializer):
                 'url': request.build_absolute_uri(obj.video_file.url)
             }
         return None
-
-
-class ContentSerializer(serializers.ModelSerializer):
     
-    group = serializers.CharField(source='user.group', read_only=True)
-    audio_files = AudioFilesSerializer(many=True, read_only=True)
-    video_files = VideoFilesSerializer(many=True, read_only=True)
+    def create(self, validated_data):
+        # Добавляем поле group_educational из запроса
+        group_educational = validated_data.pop('group_educational', None)
 
-    class Meta:
-        model = Content
-        fields = '__all__'
+        # Создаем новый объект контента с указанием группы
+        videofiles = VideoFiles.objects.create(group_educational=group_educational, **validated_data)
+        return videofiles
