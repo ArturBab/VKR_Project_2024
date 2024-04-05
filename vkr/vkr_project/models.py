@@ -12,7 +12,7 @@ class CustomUserManager(BaseUserManager):
             raise ValueError('Email is required')
         if not username:
             raise ValueError('Username is required')
-        
+
         email = self.normalize_email(email)
         user = self.model(email=email, username=username, **extra_fields)
         user.set_password(password)
@@ -45,6 +45,7 @@ class Content(models.Model):
     content_file = models.FileField(upload_to='content_files/')
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name='contents')
+    group_educational = models.CharField(max_length=20)
 
     def __str__(self):
         return self.title
@@ -62,6 +63,7 @@ class VideoFiles(models.Model):
         Content, on_delete=models.CASCADE, related_name='video_files')
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name='videos')
+    group_educational = models.CharField(max_length=20)
 
     def __str__(self):
         return self.title_video
@@ -110,6 +112,7 @@ class AudioFiles(models.Model):
         VideoFiles, on_delete=models.CASCADE, related_name='audio_file')
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name='audios')
+    group_educational = models.CharField(max_length=20)
 
     def __str__(self):
         return self.name_audio
