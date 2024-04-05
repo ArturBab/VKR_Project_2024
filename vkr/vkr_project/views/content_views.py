@@ -21,7 +21,7 @@ def content_list(request):
         # Получаем контент, доступный для просмотра авторизованному пользователю
         if user.role == 'Student':
             # Для студента показываем только контент, доступный его группе
-            content = Content.objects.filter(user__role='Teacher')
+            content = Content.objects.filter(group_educational=user.group)
         elif user.role == 'Teacher':
             # Для преподавателя показываем его собственный контент
             content = Content.objects.filter(user=user)
@@ -33,51 +33,30 @@ def content_list(request):
         return Response(serializer.data)
 
     if request.method == 'POST':
-        # Проверяем наличие поля group в запросе
-        group_number = request.data.get('group')
-        if not group_number:
-            return Response({'error': 'Укажите номер учебной группы студентов.'}, status=status.HTTP_400_BAD_REQUEST)
+        # Получаем номер учебной группы из запроса
+        group_educational = request.data.get('group_educational')
 
-        # Проверяем роль пользователя
-        if user.role == 'Student':
-            # Получаем номер учебной группы текущего пользователя
-            user_group_number = user.group
-            # Добавим отладочный вывод
-            print("User's group number:", user_group_number)
-            if not user_group_number:
-                return Response({'error': 'Укажите номер учебной группы студентов.'}, status=status.HTTP_400_BAD_REQUEST)
+        # Проверяем наличие номера учебной группы
+        if not group_educational:
+            return Response({'error': 'Укажите учебную группу.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Проверяем существование учебной группы по ее номеру
-            if not User.objects.filter(role='Student', group=user_group_number).exists():
-                # Добавим отладочный вывод
-                print("Group does not exist:", user_group_number)
-                return Response({'error': 'Указанная учебная группа не существует.'}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Добавим отладочный вывод
-            print("Group exists:", user_group_number)
-
-        # Проверяем существование указанной учебной группы
-        if not User.objects.filter(role='Student', group=group_number).exists():
-            # Добавим отладочный вывод
-            print("Group does not exist:", group_number)
+        # Проверяем существование учебной группы в модели User
+        if not User.objects.filter(role='Student', group=group_educational).exists():
             return Response({'error': 'Указанная учебная группа не существует.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Ваш текущий код для обработки POST запроса
         request.data['user'] = request.user.id
         serializer = ContentSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(user=request.user)
+            serializer.save(user=request.user,
+                            group_educational=group_educational)
             content = serializer.instance
             if 'content_file' in request.FILES:
                 content.content_file = request.FILES['content_file']
                 content.save()
 
-            # Получаем информацию о предоставленной группе
-            group_info = group_number or user.group
-
             # Обновляем сериализатор для включения информации о группе
             serialized_data = serializer.data
-            serialized_data['group'] = group_info
+            serialized_data['group_educational'] = group_educational
 
             return Response(serialized_data, status=status.HTTP_201_CREATED)
 
@@ -87,23 +66,31 @@ def content_list(request):
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated, IsTeacherAndOwnerOrReadOnly])
 def update_content(request, content_id):
-    # Получаем текущего пользователя
-    user = request.user
-
     if request.method == 'PUT':
         # Получаем контент для обновления
         content = get_object_or_404(Content, pk=content_id)
 
         # Проверяем, принадлежит ли контент текущему пользователю (преподавателю)
-        if content.user != user:
+        if content.user != request.user:
             return Response({'error': 'Вы не имеете прав на редактирование этого контента'}, status=status.HTTP_403_FORBIDDEN)
 
-        # Продолжаем обработку запроса только если контент принадлежит текущему пользователю
-        request.data['user'] = request.user.id
+        # Проверяем существование указанной учебной группы в модели User
+        group_educational = request.data.get('group_educational')
+        if not User.objects.filter(role='Student', group=group_educational).exists():
+            return Response({'error': 'Указанная учебная группа не существует'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Удаляем поле 'user' из данных запроса, если оно есть
+        if 'user' in request.data:
+            del request.data['user']
+
         serializer = ContentSerializer(content, data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            # Устанавливаем текущего пользователя как владельца контента
+            serializer.validated_data['user'] = request.user
+            # Обновляем поле group_educational
+            serializer.save(group_educational=group_educational)
             return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -120,7 +107,6 @@ def content_delete(request, content_id):
         if content.user != user:
             return Response({'error': 'Вы не имеете прав на удаление этого контента'}, status=status.HTTP_403_FORBIDDEN)
 
-        # Продолжаем удаление только если контент принадлежит текущему пользователю
         content.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     return Response(status=status.HTTP_400_BAD_REQUEST)
