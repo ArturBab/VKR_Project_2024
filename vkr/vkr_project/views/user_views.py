@@ -1,17 +1,17 @@
-from django.shortcuts import render, redirect
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework_simplejwt.tokens import RefreshToken
 from ..serializers import UserSerializer
 from ..models import User
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.exceptions import AuthenticationFailed
-from django.http import HttpResponseRedirect
 from ..permissions import *
-from ..forms import UserCreationForm
+from django.views.decorators.http import require_POST
+from django.shortcuts import redirect
+from django.contrib.auth import logout as django_logout
+from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 
 class RegisterAPIView(generics.CreateAPIView):
@@ -19,32 +19,46 @@ class RegisterAPIView(generics.CreateAPIView):
     serializer_class = UserSerializer
 
 
-@api_view(['POST'])
-def logout_view(request):
-    if request.method == 'POST':
-        try:
-            refresh_token = request.COOKIES.get('refresh_token')
+class CustomTokenObtainPairView(TokenObtainPairView):
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            # Успешно получен токен, добавим его в куки
+            access_token = response.data.get('access')
+            refresh_token = response.data.get('refresh')
 
-            if refresh_token is None:
-                raise AuthenticationFailed('Пользователь не аутентифицирован.')
+            # Устанавливаем access токен в куки
+            response.set_cookie(key='access_token',
+                                value=access_token, httponly=True)
+            # Устанавливаем refresh токен в куки
+            response.set_cookie(key='refresh_token',
+                                value=refresh_token, httponly=True)
 
-            # Очистка куки с access и refresh токенами
-            response = Response()
-            response.delete_cookie('refresh_token')
-            response.delete_cookie('access_token')
+        return response
 
-            # Удаление refresh токена из базы данных
-            token = RefreshToken(refresh_token)
-            token.blacklist()
 
-            response.data = {
-                'message': 'Вы успешно вышли из системы.'
-            }
+class LogoutAPIView(APIView):
+    def post(self, request):
+        # Удаляем куки с токенами
+        response = Response()
+        response.delete_cookie('access_token')
+        response.delete_cookie('refresh_token')
+        response.data = {'message': 'Successfully logged out.'}
+        return response
 
-            return response
 
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+class CurrentUserAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        user = request.user
+        return Response({
+            'id': user.id,
+            'username': user.username,
+            'first_name': user.first_name,
+            'middle_name': user.middle_name,
+            'last_name': user.last_name,
+            'role': user.role
+            })
 
 
 @api_view(['GET'])
