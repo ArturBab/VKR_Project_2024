@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block title %}Sign up{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <h2>Регистрация</h2>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="username">Никнейм:</label>
+                <input type="text" class="form-control" id="username" name="username" required>
+                {% if error_messages.username %}
+                    <div class="text-danger">{{ error_messages.username }}</div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                <label for="name">Имя:</label>
+                <input type="text" class="form-control" id="name" name="name" required>
+            </div>
+            <div class="form-group">
+                <label for="middle_name">Отчество:</label>
+                <input type="text" class="form-control" id="middle_name" name="middle_name">
+            </div>
+            <div class="form-group">
+                <label for="last_name">Фамилия:</label>
+                <input type="text" class="form-control" id="last_name" name="last_name" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Почта:</label>
+                <input type="email" class="form-control" id="email" name="email" required>
+                {% if error_messages.email %}
+                    <div class="text-danger">{{ error_messages.email }}</div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                <label for="password">Пароль:</label>
+                <input type="password" class="form-control" id="password" name="password" required>
+                <div id="passwordError" class="text-danger"></div>
+            </div>
+            <div class="form-group">
+                <label for="role">Роль:</label>
+                <select class="form-control" id="role" name="role" required>
+                    <option value="Teacher">Teacher</option>
+                    <option value="Student">Student</option>
+                </select>
+            </div>
+            <div class="form-group" id="groupField" style="display: none;">
+                <label for="group">Group:</label>
+                <input type="text" class="form-control" id="group" name="group">
+            </div>
+            <div class="form-group" id="telegramIdField" style="display: none;">
+                <label for="telegram_id">Telegram ID:</label>
+                <input type="text" class="form-control" id="telegram_id" name="telegram_id">
+            </div>
+            <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+
+
+        <script>
+            document.getElementById('role').addEventListener('change', function() {
+                    var role = this.value;
+                    var groupField = document.getElementById('groupField');
+                    var telegramIdField = document.getElementById('telegramIdField');
+
+                    if (role === 'Teacher') {
+                        groupField.style.display = 'none';
+                        telegramIdField.style.display = 'none';
+                    } 
+                    else {
+                        groupField.style.display = 'block';
+                        telegramIdField.style.display = 'block';
+                    }
+                });
+            
+            document.getElementById('registrationForm').addEventListener('submit', async function(event) {
+                event.preventDefault();
+                const formData = {
+                    username: document.getElementById('username').value,
+                    name: document.getElementById('name').value,
+                    middle_name: document.getElementById('moddle_name').value,
+                    last_name: document.getElementById('last_name').value,
+                    email: document.getElementById('email').value,
+                    password: document.getElementById('password').value,
+                    role: document.getElementById('role').value,
+                    group: document.getElementById('group').value,
+                    telegram_id: document.getElementById('telegram_id').value
+                };
+    
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/api/register/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData)
+                    });
+
+                    if (response.ok) {
+                        alert('Registration successful!');
+                    } else {
+                        const data = await response.json();
+                        if (data.username && data.username.includes('user with this username already exists.')) {
+                            document.getElementById('usernameError').textContent = 'Пользователь с таким именем уже существует.';
+                        }
+                        if (data.email && data.email.includes('user with this email already exists.')) {
+                            document.getElementById('emailError').textContent = 'Пользователь с такой почтой уже существует.';
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error during registration:', error);
+                    alert('Error during registration. Please try again.');
+                }
+        });
+        </script>
+    </div>
+{% endblock %}
