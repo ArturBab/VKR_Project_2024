@@ -52,7 +52,7 @@ urlpatterns = [
     path('api/teachers_list/', teachers_list, name='teachers_list'),
 
     path('', home_view, name='home'),
-    path('register/', register, name='register'),
+    path('signup/', signup, name='signup'),
     path('login/', login_view, name='login'),
 
 ]
