@@ -14,9 +14,15 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 
-class RegisterAPIView(generics.CreateAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
+class RegisterAPIView(APIView):
+    def post(self, request):
+        serializer = UserSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"success": "Registration successful"}, status=status.HTTP_201_CREATED)
+        else:
+            errors = serializer.errors
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -49,6 +55,7 @@ class LogoutAPIView(APIView):
 
 class CurrentUserAPIView(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request):
         user = request.user
         return Response({
@@ -58,7 +65,7 @@ class CurrentUserAPIView(APIView):
             'middle_name': user.middle_name,
             'last_name': user.last_name,
             'role': user.role
-            })
+        })
 
 
 @api_view(['GET'])
