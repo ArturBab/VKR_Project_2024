@@ -27,15 +27,6 @@
                 <!-- Дополнительные ссылки на другие страницы -->
             </ul>
             <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                <!-- Другие элементы навигационного меню -->
-                {% if user.is_authenticated %}
-                    <span class="navbar-text">
-                        Добро пожаловать, {{ user.username }}!
-                    </span>
-                    <a class="nav-link" href="{% url 'custom_logout' %}">Выход</a>
-                {% else %}
-                    <a class="nav-link" href="{% url 'login' %}">Войти в систему</a>
-                {% endif %}
                 <a class="nav-link" href="{% url 'signup' %}">Зарегистрироваться в систему</a>
             </div>
             <!-- Форма для поиска или дополнительные действия -->
@@ -51,7 +42,50 @@
         {% endblock %}
     </main>
 
+    <script type="text/javascript">
+        // Функция для получения списка учебных групп
+        function fetchStudentGroups() {
+            fetch('http://127.0.0.1:8000/api/groups_list/', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + getCookie('access_token'), // Передаем токен авторизации
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken') // Передаем CSRF токен
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Обновляем содержимое #student-groups-list
+                const studentGroupsList = document.getElementById('student-groups-list');
+                studentGroupsList.innerHTML = ''; // Очищаем содержимое
+                data.student_groups.forEach(group => {
+                    const groupItem = document.createElement('p');
+                    groupItem.textContent = group;
+                    studentGroupsList.appendChild(groupItem);
+                });
+            })
+            .catch(error => console.error('Error:', error));
+        }
     
+        // Вызываем функцию для получения списка учебных групп при загрузке страницы
+        window.onload = fetchStudentGroups;
+    
+        // Функция для получения значения cookie по имени
+        function getCookie(name) {
+            var cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                var cookies = document.cookie.split(';');
+                for (var i = 0; i < cookies.length; i++) {
+                    var cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
 
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
