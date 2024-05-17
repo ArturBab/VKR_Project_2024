@@ -3,9 +3,8 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from ..serializers import NotificationSerializer
-from ..models import User, Notification
-import pytz
-from django.utils import timezone
+from ..models import User, Notification, NotificationReadByStudent
+
 
 
 @api_view(['POST'])
@@ -53,6 +52,7 @@ def create_notification(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def mark_group_notifications_as_read(request):
@@ -91,21 +91,27 @@ def mark_group_notifications_as_read(request):
 @permission_classes([IsAuthenticated])
 def group_notification_status(request):
     if request.method == 'GET':
-        # Получаем список учебных групп, для которых преподаватель отправлял уведомления
-        group_educational_list = Notification.objects.filter(
-            user=request.user).values_list('group_educational', flat=True).distinct()
+        # Получаем уведомления текущего пользователя (преподавателя)
+        notifications = request.user.notifications.all()
 
-        if not group_educational_list:
-            return Response({'error': 'Преподаватель не отправил уведомлений ни одной учебной группе.'}, status=status.HTTP_400_BAD_REQUEST)
+        # Сериализуем уведомления вместе с информацией о студентах, которые прочитали каждое уведомление
+        notifications_data = []
+        for notification in notifications:
+            data = {
+                'id': notification.id,
+                'user': notification.user.username,
+                'message': notification.message,
+                'created_at': notification.created_at.strftime('%d-%m-%Y, %H:%M'),
+                'is_read': notification.is_read,
+                'group_educational': notification.group_educational,
+                'read_by_students': [
+                    {
+                        'student': read_by_student.student.username,
+                        'read_status': 'Read' if read_by_student.is_read else 'Not Read'
+                    }
+                    for read_by_student in notification.read_by_students.all()
+                ]
+            }
+            notifications_data.append(data)
 
-        # Получаем все уведомления для указанных учебных групп
-        group_notifications = Notification.objects.filter(
-            group_educational__in=group_educational_list)
-
-        # Сериализуем уведомления для передачи данных о статусе просмотра
-        notifications = []
-        for notification in group_notifications:
-            serializer = NotificationSerializer(notification)
-            notifications.append(serializer.data)
-
-        return Response({'notifications': notifications})
+        return Response({'notifications': notifications_data})
