@@ -4,11 +4,20 @@ import os
 import sys
 
 
+# Создаем функцию, которая будет вызываться при завершении программы
+# def exit_handler():
+#    notify_server_stop(None)
+
 def main():
     """Run administrative tasks."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings.settings')
     try:
         from django.core.management import execute_from_command_line
+
+        # atexit.register(exit_handler)
+        # Отправляем уведомление о запуске сервера
+        # notify_server_start()
+
     except ImportError as exc:
         raise ImportError(
             "Couldn't import Django. Are you sure it's installed and "
