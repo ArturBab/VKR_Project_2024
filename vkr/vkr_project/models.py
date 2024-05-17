@@ -1,7 +1,4 @@
 from django.db import models
-import time
-from django.http import HttpResponse
-from django.utils import timezone
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.models import BaseUserManager
 
@@ -54,7 +51,7 @@ class Notification(models.Model):
     
 
 class NotificationReadByStudent(models.Model):
-    notification = models.ForeignKey(Notification, on_delete=models.CASCADE)
+    notification = models.ForeignKey(Notification, on_delete=models.CASCADE, related_name='read_by_students')
     student = models.ForeignKey(User, on_delete=models.CASCADE)
     is_read = models.BooleanField(default=False)
     
