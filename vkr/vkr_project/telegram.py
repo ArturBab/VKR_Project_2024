@@ -1,12 +1,12 @@
-from telegram import Bot
-from telegram.error import TelegramError
+from telegram import Bot, Update
 from telegram.ext import *
 import json
 from django.http import JsonResponse
 import requests
 from django.views.decorators.csrf import csrf_exempt
 import requests
-from settings.settings import TELEGRAM_BOT_TOKEN, ADMIN_TELEGRAM_CHAT_ID
+from settings.settings import TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME, ADMIN_TELEGRAM_CHAT_ID
+
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -14,6 +14,12 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth.models import User
 
+
+import os
+import signal
+import sys
+from threading import Thread
+import signal
 
 
 def notify_server_start():
@@ -55,12 +61,6 @@ def notify_server_stop(request):
             return JsonResponse({'error': f'Failed to send message to Telegram bot. Error message: {response.text}'}, status=500)
     except Exception as e:
         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
-    
-# --------------------------------------------------------------------------------------#
-
-
-
-# --------------------------------------------------------------------------------------#
 
 
 @csrf_exempt
@@ -93,3 +93,36 @@ def send_telegram_notification(request):
 
     else:
         return JsonResponse({'error': 'Invalid request method'}, status=400)
+    
+
+def send_notification_via_telegram(chat_id, message):
+    bot_token = TELEGRAM_BOT_TOKEN
+    bot = Bot(token=bot_token)
+    bot.send_message(chat_id=chat_id, text=message)
+
+    
+# --------------------------------------------------------------------------------------#
+
+# Обработчик команды /start
+def start(update, context):
+    chat_id = update.message.chat_id
+    message = f"Здравствуйте! Ваш chat ID: {chat_id}"
+    update.message.reply_text(message)
+
+def run_bot(TELEGRAM_BOT_TOKEN):
+    from telegram.ext import Updater, CommandHandler
+
+    # Инициализация ТГ бота
+    updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
+
+    # Получаем диспетчер для регистрации обработчиков
+    dp = updater.dispatcher
+
+    # Добавляем обработчик команды /start
+    dp.add_handler(CommandHandler("start", start))
+
+    # Запуск бота
+    updater.start_polling()
+    updater.idle()
+
+# --------------------------------------------------------------------------------------#    
