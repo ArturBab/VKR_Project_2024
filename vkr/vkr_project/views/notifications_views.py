@@ -4,7 +4,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from ..serializers import NotificationSerializer
 from ..models import User, Notification, NotificationReadByStudent
-
+from ..telegram import send_notification_via_telegram, ADMIN_TELEGRAM_CHAT_ID
 
 
 @api_view(['POST'])
@@ -46,10 +46,34 @@ def create_notification(request):
         if serializer.is_valid():
             # Сохраняем уведомление
             serializer.save(user=user)
+
+            send_notification_via_telegram(chat_id=ADMIN_TELEGRAM_CHAT_ID, message=request.data.get('message'))
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         # В случае ошибки валидации возвращаем ошибку
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_notification_as_read_via_bot(request):
+    if request.method == 'POST':
+        # Получаем данные из запроса, например, идентификатор уведомления
+        notification_id = request.data.get('notification_id')
+
+        # Находим уведомление в базе данных
+        notification = Notification.objects.get(id=notification_id)
+
+        # Помечаем уведомление как прочитанное
+        notification.is_read = True
+        notification.save()
+
+        # Возвращаем подтверждение об успешном обновлении статуса
+        return Response({'message': 'Статус уведомления успешно обновлен.'})
+
+
 
 
 
