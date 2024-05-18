@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.urls import path, include, re_path
-from vkr_project.views.content_views import content_list, update_content, content_delete
+from vkr_project.views.content_views import content_list, update_content, content_delete, telegram_content_detail
 from vkr_project.views.audiofiles_views import audio_files_list, update_audio_file, audio_files_delete
 from vkr_project.views.videofiles_views import video_files_list, update_video_file, video_files_delete
 from vkr_project.views.notifications_views import (create_notification, 
@@ -18,6 +18,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     path('api/content/', content_list, name='api-content_list'),
+    path('telegram/content/<int:content_id>/', telegram_content_detail, name='telegram_content_detail'),
     path('api/content/update/<int:content_id>/',
          update_content, name='update_content'),
     path('api/content/delete/<int:content_id>/',
