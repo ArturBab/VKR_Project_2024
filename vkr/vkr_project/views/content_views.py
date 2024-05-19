@@ -20,9 +20,8 @@ def telegram_content_detail(request, content_id):
     content = get_object_or_404(Content, pk=content_id)
     # Отправка текстовых данных в Телеграм
     bot = telegram.Bot(token=TELEGRAM_BOT_TOKEN)
-    # Замените на ваш ID чата или получите его динамически
     chat_id = ADMIN_TELEGRAM_CHAT_ID
-    message = f"Название: {content.title}\nПуть к файлу: {content.file_path}"
+    message = f"Название: {content.title}\nПуть к файлу: {content.file_path}\nУчебная группа: {content.group_educational}\nПреподаватель: {content.user}"
     bot.send_message(chat_id=chat_id, text=message)
 
     # Отправка файла в Телеграм
