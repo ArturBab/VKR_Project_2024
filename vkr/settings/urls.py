@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include, re_path
 from vkr_project.views.content_views import content_list, update_content, content_delete, telegram_content_detail
-from vkr_project.views.audiofiles_views import audio_files_list, update_audio_file, audio_files_delete
+from vkr_project.views.audiofiles_views import audio_files_list, update_audio_file, audio_files_delete, send_audio_to_telegram
 from vkr_project.views.videofiles_views import video_files_list, update_video_file, video_files_delete, send_video_to_telegram_view
 from vkr_project.views.notifications_views import (create_notification, 
                                                    mark_group_notifications_as_read, 
@@ -27,9 +27,12 @@ urlpatterns = [
          content_delete, name='content-delete'),
 
     path('api/audio_files/', audio_files_list),
+
+    path('telegram/send_audio/<int:audio_id>/', send_audio_to_telegram, name='send_audio_to_telegram'),
+    
     path('api/audio/update/<int:audio_id>/',
          update_audio_file, name='update_audio_file'),
-    path('api/audio/delete/', audio_files_delete, name='audio-files-delete'),
+    path('api/audio/delete/<int:audio_id>/', audio_files_delete, name='audio-files-delete'),
 
     path('api/video_files/', video_files_list),
 
